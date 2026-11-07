@@ -1,0 +1,530 @@
+// FeeDesk — multi-institution fee collection SaaS (India)
+// Dev/testing: SQLite. Production: change provider to "postgresql" and run `prisma migrate dev`.
+// Conventions:
+//  - All money fields are integer PAISE (Int). ₹1,250.50 = 125050.
+//  - "enum-like" fields are Strings (portable across SQLite/Postgres); allowed values listed in comments.
+//  - Every tenant table carries institutionId. All queries must be scoped by it.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────── PLATFORM ─────────────────────────────
+
+model Plan {
+  id           String        @id @default(cuid())
+  name         String        @unique
+  maxStudents  Int?          // null = unlimited
+  pricePaise   Int           // per year
+  isActive     Boolean       @default(true)
+  institutions Institution[]
+  createdAt    DateTime      @default(now())
+}
+
+model PlatformUser {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   // super_admin | support
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+}
+
+model Institution {
+  id            String   @id @default(cuid())
+  code          String   @unique // subdomain / short code e.g. dav-bbsr
+  name          String
+  type          String   // school | college | coaching | other
+  board         String?  // CBSE | ICSE | State | University name ...
+  email         String?
+  phone         String?
+  addressLine   String?
+  city          String?
+  state         String?
+  pincode       String?
+  gstin         String?
+  pan           String?
+  logoUrl       String?
+  status        String   @default("trial") // trial | active | suspended
+  planId        String?
+  plan          Plan?    @relation(fields: [planId], references: [id])
+  trialEndsAt   DateTime?
+  receiptPrefix String   @default("RCPT")
+  convenienceFeeEnabled Boolean @default(false)
+  convenienceFeeBps     Int     @default(0) // basis points, 150 = 1.5%
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  users              User[]
+  academicYears      AcademicYear[]
+  units              Unit[]
+  sections           Section[]
+  students           Student[]
+  guardians          Guardian[]
+  feeHeads           FeeHead[]
+  feeStructures      FeeStructure[]
+  concessions        Concession[]
+  studentConcessions StudentConcession[]
+  lateFineRules      LateFineRule[]
+  feeDemands         FeeDemand[]
+  payments           Payment[]
+  allocations        PaymentAllocation[]
+  receipts           Receipt[]
+  receiptCounters    ReceiptCounter[]
+  refunds            Refund[]
+  gatewayConfigs     GatewayConfig[]
+  gatewayOrders      GatewayOrder[]
+  webhookEvents      WebhookEvent[]
+  auditLogs          AuditLog[]
+}
+
+// ───────────────────────────── INSTITUTION USERS ─────────────────────────────
+
+model User {
+  id            String      @id @default(cuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  name          String
+  email         String?
+  phone         String?
+  passwordHash  String
+  role          String      // admin | accountant | cashier
+  isActive      Boolean     @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime    @default(now())
+
+  paymentsCollected Payment[] @relation("CollectedBy")
+
+  @@unique([institutionId, email])
+  @@unique([institutionId, phone])
+}
+
+// ───────────────────────────── ACADEMIC STRUCTURE ─────────────────────────────
+
+model AcademicYear {
+  id            String      @id @default(cuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  name          String      // "2026-27"
+  startDate     DateTime
+  endDate       DateTime
+  isCurrent     Boolean     @default(false)
+
+  enrollments   Enrollment[]
+  feeStructures FeeStructure[]
+  feeDemands    FeeDemand[]
+
+  @@unique([institutionId, name])
+}
+
+/// Class (school), Course/Programme+Semester (college), or Batch (coaching)
+model Unit {
+  id            String      @id @default(cuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  name          String      // "Class 5", "B.Tech CSE Sem 3", "JEE 2027 Batch A"
+  kind          String      // class | course | semester | batch
+  sortOrder     Int         @default(0)
+  isActive      Boolean     @default(true)
+
+  sections      Section[]
+  enrollments   Enrollment[]
+  feeStructures FeeStructure[]
+
+  @@unique([institutionId, name])
+}
+
+model Section {
+  id            String      @id @default(cuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  unitId        String
+  unit          Unit        @relation(fields: [unitId], references: [id])
+  name          String      // "A", "B"
+
+  enrollments   Enrollment[]
+
+  @@unique([unitId, name])
+}
+
+// ───────────────────────────── STUDENTS ─────────────────────────────
+
+model Student {
+  id            String      @id @default(cuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  admissionNo   String
+  firstName     String
+  lastName      String?
+  gender        String?     // male | female | other
+  dob           DateTime?
+  category      String?     // general | obc | sc | st | ews
+  isRte         Boolean     @default(false)
+  phone         String?
+  email         String?
+  address       String?
+  status        String      @default("active") // active | left | passed_out | suspended
+  admittedOn    DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  guardians     StudentGuardian[]
+  enrollments   Enrollment[]
+  concessions   StudentConcession[]
+  feeDemands    FeeDemand[]
+  payments      Payment[]
+  gatewayOrders GatewayOrder[]
+
+  @@unique([institutionId, admissionNo])
+  @@index([institutionId, firstName])
+}
+
+model Guardian {
+  id            String      @id @default(cuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  name          String
+  relation      String      // father | mother | guardian
+  phone         String      // parent portal login (OTP)
+  email         String?
+  occupation    String?
+  createdAt     DateTime    @default(now())
+
+  students      StudentGuardian[]
+
+  @@index([institutionId, phone])
+}
+
+model StudentGuardian {
+  studentId  String
+  student    Student  @relation(fields: [studentId], references: [id])
+  guardianId String
+  guardian   Guardian @relation(fields: [guardianId], references: [id])
+  isPrimary  Boolean  @default(false)
+
+  @@id([studentId, guardianId])
+}
+
+/// Which unit/section a student is in for a given academic year (supports promotion)
+model Enrollment {
+  id             String       @id @default(cuid())
+  studentId      String
+  student        Student      @relation(fields: [studentId], references: [id])
+  academicYearId String
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
+  unitId         String
+  unit           Unit         @relation(fields: [unitId], references: [id])
+  sectionId      String?
+  section        Section?     @relation(fields: [sectionId], references: [id])
+  rollNo         String?
+  usesTransport  Boolean      @default(false)
+  transportRoute String?
+  usesHostel     Boolean      @default(false)
+
+  @@unique([studentId, academicYearId])
+}
+
+// ───────────────────────────── FEE SETUP ─────────────────────────────
+
+model FeeHead {
+  id            String      @id @default(cuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  name          String      // Tuition, Admission, Development, Transport, Hostel, Exam, Lab, Library
+  code          String
+  isRefundable  Boolean     @default(false) // e.g. caution deposit
+  isOptional    Boolean     @default(false) // e.g. transport, hostel
+  gstApplicable Boolean     @default(false)
+  gstRateBps    Int         @default(0)     // 1800 = 18%
+  hsnSac        String?
+  isTuition     Boolean     @default(false) // for 80C certificates later
+  isActive      Boolean     @default(true)
+
+  structureItems FeeStructureItem[]
+  concessions    Concession[]
+  feeDemands     FeeDemand[]
+
+  @@unique([institutionId, code])
+}
+
+/// A fee plan for one unit in one academic year
+model FeeStructure {
+  id             String       @id @default(cuid())
+  institutionId  String
+  institution    Institution  @relation(fields: [institutionId], references: [id])
+  academicYearId String
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
+  unitId         String
+  unit           Unit         @relation(fields: [unitId], references: [id])
+  name           String
+  lateFineRuleId String?
+  lateFineRule   LateFineRule? @relation(fields: [lateFineRuleId], references: [id])
+
+  items        FeeStructureItem[]
+  installments FeeInstallment[]
+
+  @@unique([academicYearId, unitId, name])
+}
+
+model FeeStructureItem {
+  id             String       @id @default(cuid())
+  feeStructureId String
+  feeStructure   FeeStructure @relation(fields: [feeStructureId], references: [id])
+  feeHeadId      String
+  feeHead        FeeHead      @relation(fields: [feeHeadId], references: [id])
+  amountPaise    Int          // amount per period
+  frequency      String       // one_time | monthly | quarterly | half_yearly | yearly | per_installment
+
+  @@unique([feeStructureId, feeHeadId])
+}
+
+/// Billing periods/due dates of a structure (months, terms, semesters or EMI installments)
+model FeeInstallment {
+  id             String       @id @default(cuid())
+  feeStructureId String
+  feeStructure   FeeStructure @relation(fields: [feeStructureId], references: [id])
+  label          String       // "April 2026", "Term 1", "Installment 2"
+  dueDate        DateTime
+  sortOrder      Int          @default(0)
+
+  feeDemands     FeeDemand[]
+}
+
+model Concession {
+  id            String      @id @default(cuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  name          String      // Sibling, Staff ward, Merit, RTE, Scholarship
+  type          String      // percent | flat
+  valueBps      Int?        // percent in basis points (1000 = 10%)
+  valuePaise    Int?        // flat amount per demand
+  feeHeadId     String?     // null = applies to all heads
+  feeHead       FeeHead?    @relation(fields: [feeHeadId], references: [id])
+  isActive      Boolean     @default(true)
+
+  students      StudentConcession[]
+}
+
+model StudentConcession {
+  id            String      @id @default(cuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  studentId     String
+  student       Student     @relation(fields: [studentId], references: [id])
+  concessionId  String
+  concession    Concession  @relation(fields: [concessionId], references: [id])
+  validFrom     DateTime?
+  validTo       DateTime?
+  approvedById  String?
+  remarks       String?
+
+  @@unique([studentId, concessionId])
+}
+
+model LateFineRule {
+  id            String      @id @default(cuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  name          String
+  type          String      // per_day | flat | slab
+  graceDays     Int         @default(0)
+  amountPaise   Int         @default(0) // per day or flat
+  maxPaise      Int?        // cap
+  slabsJson     String?     // [{ "fromDay":1,"toDay":15,"amountPaise":5000 }, ...]
+
+  feeStructures FeeStructure[]
+}
+
+// ───────────────────────────── LEDGER ─────────────────────────────
+
+/// What a student owes: one row per student × head × period
+model FeeDemand {
+  id               String          @id @default(cuid())
+  institutionId    String
+  institution      Institution     @relation(fields: [institutionId], references: [id])
+  studentId        String
+  student          Student         @relation(fields: [studentId], references: [id])
+  academicYearId   String
+  academicYear     AcademicYear    @relation(fields: [academicYearId], references: [id])
+  feeHeadId        String
+  feeHead          FeeHead         @relation(fields: [feeHeadId], references: [id])
+  installmentId    String?
+  installment      FeeInstallment? @relation(fields: [installmentId], references: [id])
+  periodLabel      String
+  dueDate          DateTime
+  grossPaise       Int
+  concessionPaise  Int             @default(0)
+  gstPaise         Int             @default(0)
+  netPaise         Int             // gross - concession + gst
+  fineWaivedPaise  Int             @default(0)
+  paidPaise        Int             @default(0) // denormalised sum of allocations (kept in sync in a transaction)
+  status           String          @default("due") // due | partial | paid | cancelled
+  createdAt        DateTime        @default(now())
+
+  allocations      PaymentAllocation[]
+
+  @@unique([studentId, feeHeadId, installmentId])
+  @@index([institutionId, status, dueDate])
+}
+
+/// Money received, any mode
+model Payment {
+  id             String      @id @default(cuid())
+  institutionId  String
+  institution    Institution @relation(fields: [institutionId], references: [id])
+  studentId      String
+  student        Student     @relation(fields: [studentId], references: [id])
+  amountPaise    Int
+  finePaise      Int         @default(0)
+  convenienceFeePaise Int    @default(0)
+  mode           String      // cash | cheque | dd | upi | neft | card | online
+  channel        String      // counter | parent_portal | payment_link
+  status         String      @default("success") // pending | success | failed | bounced | cancelled
+  referenceNo    String?     // UTR / cheque no / txn id
+  bankName       String?
+  chequeDate     DateTime?
+  chequeStatus   String?     // received | cleared | bounced
+  gatewayOrderId String?     @unique
+  gatewayOrder   GatewayOrder? @relation(fields: [gatewayOrderId], references: [id])
+  collectedById  String?
+  collectedBy    User?       @relation("CollectedBy", fields: [collectedById], references: [id])
+  paidAt         DateTime    @default(now())
+  remarks        String?
+  createdAt      DateTime    @default(now())
+
+  allocations    PaymentAllocation[]
+  receipt        Receipt?
+  refunds        Refund[]
+
+  @@index([institutionId, paidAt])
+}
+
+model PaymentAllocation {
+  id            String      @id @default(cuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  paymentId     String
+  payment       Payment     @relation(fields: [paymentId], references: [id])
+  feeDemandId   String
+  feeDemand     FeeDemand   @relation(fields: [feeDemandId], references: [id])
+  amountPaise   Int
+
+  @@unique([paymentId, feeDemandId])
+}
+
+model Receipt {
+  id            String      @id @default(cuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  paymentId     String      @unique
+  payment       Payment     @relation(fields: [paymentId], references: [id])
+  receiptNo     String      // RCPT/2026-27/000123
+  financialYear String      // "2026-27" (Apr–Mar)
+  issuedAt      DateTime    @default(now())
+  status        String      @default("valid") // valid | cancelled
+  cancelReason  String?
+  cancelledAt   DateTime?
+  cancelledById String?
+
+  @@unique([institutionId, receiptNo])
+}
+
+/// Gap-free sequential receipt numbers per institution per financial year
+model ReceiptCounter {
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  financialYear String
+  lastNo        Int         @default(0)
+
+  @@id([institutionId, financialYear])
+}
+
+model Refund {
+  id            String      @id @default(cuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  paymentId     String
+  payment       Payment     @relation(fields: [paymentId], references: [id])
+  amountPaise   Int
+  mode          String      // cash | neft | gateway
+  reason        String
+  status        String      @default("pending") // pending | processed | failed
+  gatewayRefundId String?
+  processedAt   DateTime?
+  createdAt     DateTime    @default(now())
+}
+
+// ───────────────────────────── ONLINE PAYMENTS ─────────────────────────────
+
+/// Each institution's own gateway account (v1: Razorpay)
+model GatewayConfig {
+  id                     String      @id @default(cuid())
+  institutionId          String
+  institution            Institution @relation(fields: [institutionId], references: [id])
+  provider               String      // razorpay | cashfree | payu
+  keyId                  String
+  keySecretEnc           String      // AES-256-GCM encrypted
+  webhookSecretEnc       String
+  mode                   String      @default("test") // test | live
+  isActive               Boolean     @default(true)
+  createdAt              DateTime    @default(now())
+
+  @@unique([institutionId, provider])
+}
+
+model GatewayOrder {
+  id              String      @id @default(cuid())
+  institutionId   String
+  institution     Institution @relation(fields: [institutionId], references: [id])
+  studentId       String
+  student         Student     @relation(fields: [studentId], references: [id])
+  provider        String
+  providerOrderId String      @unique
+  amountPaise     Int         // total charged incl. fine + convenience fee
+  demandIdsJson   String      // demands this order is meant to settle
+  status          String      @default("created") // created | paid | failed | expired
+  createdAt       DateTime    @default(now())
+
+  payment         Payment?
+}
+
+/// Raw webhook log; providerEventId unique => idempotent processing
+model WebhookEvent {
+  id              String      @id @default(cuid())
+  institutionId   String
+  institution     Institution @relation(fields: [institutionId], references: [id])
+  provider        String
+  providerEventId String
+  eventType       String
+  payloadJson     String
+  processedAt     DateTime?
+  error           String?
+  receivedAt      DateTime    @default(now())
+
+  @@unique([provider, providerEventId])
+}
+
+// ───────────────────────────── AUDIT ─────────────────────────────
+
+model AuditLog {
+  id            String      @id @default(cuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  actorType     String      // user | platform_user | guardian | system
+  actorId       String?
+  action        String      // create | update | cancel | waive | login | refund ...
+  entity        String
+  entityId      String
+  beforeJson    String?
+  afterJson     String?
+  ip            String?
+  createdAt     DateTime    @default(now())
+
+  @@index([institutionId, entity, entityId])
+}
