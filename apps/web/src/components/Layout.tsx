@@ -14,6 +14,7 @@ const NAV: { title?: string; items: Item[] }[] = [
     { to: "/setup/fee-types", label: "Fee types", perm: "setup.read" },
     { to: "/setup/fee-heads", label: "Fee heads", perm: "setup.read" },
     { to: "/setup/fee-structures", label: "Fee structures", perm: "setup.read" },
+    { to: "/setup/fee-mapping", label: "Fee mapping & dues", perm: "setup.read" },
     { to: "/setup/concessions", label: "Concessions", perm: "setup.read" },
     { to: "/setup/late-fines", label: "Late fine rules", perm: "setup.read" },
     { to: "/setup/bank-accounts", label: "Bank accounts", perm: "setup.read" },

@@ -154,3 +154,15 @@ table.mini td { padding: 6px 0; font-size: 14px; border-bottom: 1px dashed var(-
   .grid2 { grid-template-columns: 1fr; } .span2 { grid-column: auto; }
   .topbar { padding: 0 14px; gap: 12px; } .content { padding: 20px 14px; }
 }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 16px; } .span3 { grid-column: span 3; }
+.guardian { padding-top: 12px; border-top: 1px dashed var(--line); }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.kv { display: flex; justify-content: space-between; gap: 16px; font-size: 14px; padding: 6px 0; border-bottom: 1px dashed var(--line); align-items: center; }
+.kv:last-child { border-bottom: 0; }
+.stats.four { grid-template-columns: repeat(4, 1fr); }
+.pill.bad { background: var(--err-bg); color: var(--err); } .bad-text { color: var(--err); }
+.plain-link { color: var(--ink); }
+.btnlink-primary { display: inline-grid; place-items: center; color: #fff; border-radius: 10px; } .btnlink-primary:hover { text-decoration: none; color: #fff; }
+.drop { border: 2px dashed var(--line); border-radius: 14px; padding: 24px; display: grid; gap: 6px; text-align: center; cursor: pointer; }
+.drop:hover { border-color: var(--brand); } .drop input { display: none; }
+@media (max-width: 900px) { .grid3, .two-col, .stats.four { grid-template-columns: 1fr; } .span3 { grid-column: auto; } }

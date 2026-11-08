@@ -17,7 +17,7 @@ const Body = z.object({
   installments: z.array(z.object({ label: z.string().trim().min(1, "Instalment label is required"), dueDate: z.coerce.date() })).default([]),
 });
 
-const full = { items: { include: { feeHead: { select: { name: true, code: true } } } }, installments: { orderBy: { sortOrder: "asc" as const } }, unit: { select: { name: true } }, academicYear: { select: { name: true } }, lateFineRule: { select: { name: true } } };
+const full = { items: { include: { feeHead: { select: { name: true, code: true, isOptional: true } } } }, installments: { orderBy: { sortOrder: "asc" as const } }, unit: { select: { name: true } }, academicYear: { select: { name: true } }, lateFineRule: { select: { name: true } } };
 
 const total = (s: any) => s.items.reduce((t: number, i: any) => {
   const n = s.installments.length || 1;

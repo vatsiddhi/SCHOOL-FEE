@@ -16,6 +16,7 @@ export default function SetupHome() {
     ["Fee heads", "/setup/fee-heads", (p.heads as number) > 0, `${p.heads} active heads`],
     ["Bank accounts", "/setup/bank-accounts", (p.banks as number) > 0, `${p.banks} account(s)`],
     ["Fee structures", "/setup/fee-structures", (p.structures as number) > 0, `${p.structures} structures`],
+    ["Students and fee mapping", "/setup/fee-mapping", (p.students as number) > 0, `${p.students} students`],
     ["Concessions and late fines", "/setup/concessions", true, "Optional"],
     ["Staff and roles", "/staff", (p.staff as number) > 1, `${p.staff} staff`],
   ];

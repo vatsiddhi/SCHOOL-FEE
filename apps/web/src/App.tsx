@@ -4,7 +4,11 @@ import { api, can, clearToken, getToken, type User } from "./lib/api";
 import Login from "./pages/Login";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
-import Students from "./pages/Students";
+import Students from "./pages/students/Students";
+import StudentForm from "./pages/students/StudentForm";
+import StudentDetail from "./pages/students/StudentDetail";
+import Import from "./pages/students/Import";
+import FeeMapping from "./pages/setup/FeeMapping";
 import SetupHome from "./pages/setup/SetupHome";
 import Organisation from "./pages/setup/Organisation";
 import FeeStructures from "./pages/setup/FeeStructures";
@@ -29,7 +33,15 @@ export default function App() {
       <Routes>
         <Route element={<LayoutWithCtx user={user} onSignOut={signOut} />}>
           <Route index element={<Dashboard />} />
-          <Route element={<Guard perm="students.read" />}><Route path="students" element={<Students />} /></Route>
+          <Route element={<Guard perm="students.read" />}>
+            <Route path="students" element={<Students />} />
+            <Route path="students/:id" element={<StudentDetail />} />
+          </Route>
+          <Route element={<Guard perm="students.write" />}>
+            <Route path="students/new" element={<StudentForm />} />
+            <Route path="students/import" element={<Import />} />
+            <Route path="students/:id/edit" element={<StudentForm />} />
+          </Route>
           <Route path="setup" element={<Guard perm="setup.read" />}>
             <Route index element={<SetupHome />} />
             <Route path="organisation" element={<Organisation />} />
@@ -39,6 +51,7 @@ export default function App() {
             <Route path="fee-types" element={<FeeTypes />} />
             <Route path="fee-heads" element={<FeeHeads />} />
             <Route path="fee-structures" element={<FeeStructures />} />
+            <Route path="fee-mapping" element={<FeeMapping />} />
             <Route path="concessions" element={<Concessions />} />
             <Route path="late-fines" element={<LateFines />} />
             <Route path="bank-accounts" element={<BankAccounts />} />

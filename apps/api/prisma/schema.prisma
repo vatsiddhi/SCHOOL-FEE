@@ -188,7 +188,12 @@ model Student {
   phone         String?
   email         String?
   address       String?
-  status        String      @default("active") // active | left | passed_out | suspended
+  status        String      @default("active") // active | left | passed_out | transferred | suspended
+  apaarId       String?     // national student ID (APAAR)
+  aadhaarLast4  String?     // only last 4 digits stored
+  bloodGroup    String?
+  leftOn        DateTime?
+  leftReason    String?
   admittedOn    DateTime?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -245,8 +250,22 @@ model Enrollment {
   usesTransport  Boolean      @default(false)
   transportRoute String?
   usesHostel     Boolean      @default(false)
+  feeCategory    String?      // new | old | management | hosteller | day_scholar | nri
+  feeStructureId String?      // explicit mapping; null = auto by class + category
+  feeStructure   FeeStructure? @relation(fields: [feeStructureId], references: [id])
+  optionalHeads  EnrollmentOptionalHead[]
 
   @@unique([studentId, academicYearId])
+}
+
+/// Optional fee heads (transport, hostel, computer …) a student has opted into for a year
+model EnrollmentOptionalHead {
+  enrollmentId String
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id])
+  feeHeadId    String
+  feeHead      FeeHead    @relation(fields: [feeHeadId], references: [id])
+
+  @@id([enrollmentId, feeHeadId])
 }
 
 // ───────────────────────────── FEE SETUP ─────────────────────────────
@@ -273,6 +292,7 @@ model FeeHead {
   isActive      Boolean     @default(true)
 
   structureItems FeeStructureItem[]
+  optedBy        EnrollmentOptionalHead[]
   concessions    Concession[]
   feeDemands     FeeDemand[]
 
@@ -325,6 +345,7 @@ model FeeStructure {
 
   items        FeeStructureItem[]
   installments FeeInstallment[]
+  enrollments  Enrollment[]
 
   @@unique([academicYearId, unitId, name])
 }
