@@ -51,6 +51,17 @@ model Institution {
   gstin         String?
   pan           String?
   logoUrl       String?
+  shortName     String?
+  district      String?
+  website       String?
+  affiliationNo String?
+  udiseCode     String?  // schools (UDISE+)
+  aisheCode     String?  // colleges (AISHE)
+  trustName     String?
+  registrationNo String?
+  receiptHeader String?
+  receiptFooter String?
+  themeColor    String?  @default("#4338ca")
   status        String   @default("trial") // trial | active | suspended
   planId        String?
   plan          Plan?    @relation(fields: [planId], references: [id])
@@ -68,6 +79,8 @@ model Institution {
   students           Student[]
   guardians          Guardian[]
   feeHeads           FeeHead[]
+  feeTypes           FeeType[]
+  bankAccounts       BankAccount[]
   feeStructures      FeeStructure[]
   concessions        Concession[]
   studentConcessions StudentConcession[]
@@ -115,6 +128,7 @@ model AcademicYear {
   startDate     DateTime
   endDate       DateTime
   isCurrent     Boolean     @default(false)
+  isLocked      Boolean     @default(false)
 
   enrollments   Enrollment[]
   feeStructures FeeStructure[]
@@ -130,7 +144,9 @@ model Unit {
   institution   Institution @relation(fields: [institutionId], references: [id])
   name          String      // "Class 5", "B.Tech CSE Sem 3", "JEE 2027 Batch A"
   kind          String      // class | course | semester | batch
+  stream        String?     // Science | Commerce | Arts (Class 11-12)
   sortOrder     Int         @default(0)
+  nextUnitId    String?     // promotes to
   isActive      Boolean     @default(true)
 
   sections      Section[]
@@ -147,6 +163,9 @@ model Section {
   unitId        String
   unit          Unit        @relation(fields: [unitId], references: [id])
   name          String      // "A", "B"
+  capacity      Int?
+  classTeacher  String?
+  isActive      Boolean     @default(true)
 
   enrollments   Enrollment[]
 
@@ -238,6 +257,13 @@ model FeeHead {
   institution   Institution @relation(fields: [institutionId], references: [id])
   name          String      // Tuition, Admission, Development, Transport, Hostel, Exam, Lab, Library
   code          String
+  feeTypeId     String?
+  feeType       FeeType?    @relation(fields: [feeTypeId], references: [id])
+  bankAccountId String?
+  bankAccount   BankAccount? @relation(fields: [bankAccountId], references: [id])
+  concessionAllowed Boolean @default(true)
+  fineApplicable    Boolean @default(true)
+  sortOrder     Int         @default(0)
   isRefundable  Boolean     @default(false) // e.g. caution deposit
   isOptional    Boolean     @default(false) // e.g. transport, hostel
   gstApplicable Boolean     @default(false)
@@ -253,6 +279,35 @@ model FeeHead {
   @@unique([institutionId, code])
 }
 
+/// Group of fee heads: Academic, Admission, Transport, Hostel, Library, Store, Exam, Activity, Deposit, Misc
+model FeeType {
+  id            String      @id @default(cuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  name          String
+  code          String
+  sortOrder     Int         @default(0)
+  isActive      Boolean     @default(true)
+  feeHeads      FeeHead[]
+
+  @@unique([institutionId, code])
+}
+
+/// Institution bank accounts; each fee head can settle to a specific account
+model BankAccount {
+  id            String      @id @default(cuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  label         String      // "Trust main account"
+  bankName      String
+  accountNo     String
+  ifsc          String
+  branch        String?
+  isDefault     Boolean     @default(false)
+  isActive      Boolean     @default(true)
+  feeHeads      FeeHead[]
+}
+
 /// A fee plan for one unit in one academic year
 model FeeStructure {
   id             String       @id @default(cuid())
@@ -265,6 +320,8 @@ model FeeStructure {
   name           String
   lateFineRuleId String?
   lateFineRule   LateFineRule? @relation(fields: [lateFineRuleId], references: [id])
+  category       String?      // null = all students; new | old | management | hosteller | day_scholar | nri
+  status         String       @default("draft") // draft | published
 
   items        FeeStructureItem[]
   installments FeeInstallment[]

@@ -24,7 +24,7 @@ async function main() {
   const inst = await prisma.institution.upsert({
     where: { code: "demo-school" },
     update: {},
-    create: { code: "demo-school", name: "Demo Public School", type: "school", board: "CBSE", city: "Bhubaneswar", state: "Odisha", pincode: "751001", status: "trial", planId: plan.id, receiptPrefix: "DPS" },
+    create: { code: "demo-school", name: "Demo Public School", shortName: "DPS", type: "school", board: "CBSE", affiliationNo: "1530001", udiseCode: "21150100101", addressLine: "Plot 12, Saheed Nagar", city: "Bhubaneswar", district: "Khordha", state: "Odisha", pincode: "751007", phone: "06742540000", email: "office@demo.school", status: "trial", planId: plan.id, receiptPrefix: "DPS", receiptFooter: "Fees once paid are not refundable except caution deposit." },
   });
   const institutionId = inst.id;
 
@@ -34,6 +34,19 @@ async function main() {
     create: { institutionId, name: "School Accountant", email: "accounts@demo.school", passwordHash: await bcrypt.hash("demo123", 10), role: "admin" },
   });
 
+  for (const u of [
+    { name: "Priya Sahoo", email: "accountant@demo.school", role: "accountant" },
+    { name: "Ramesh Nayak", email: "cashier@demo.school", role: "cashier" },
+  ]) {
+    await prisma.user.create({ data: { institutionId, ...u, passwordHash: await bcrypt.hash("demo1234", 10) } });
+  }
+
+  const bank = await prisma.bankAccount.create({ data: { institutionId, label: "School main account", bankName: "State Bank of India", accountNo: "30123456789", ifsc: "SBIN0010236", branch: "Saheed Nagar", isDefault: true } });
+  const typeMap: Record<string, string> = {};
+  for (const [i, t] of [["ACA", "Academic"], ["ADM", "Admission"], ["TRN", "Transport"], ["HST", "Hostel"], ["LIB", "Library"], ["STR", "Store"], ["EXM", "Exam"], ["DEP", "Deposit"], ["MSC", "Miscellaneous"]].entries()) {
+    typeMap[t[0]] = (await prisma.feeType.create({ data: { institutionId, code: t[0], name: t[1], sortOrder: i } })).id;
+  }
+
   const year = await prisma.academicYear.upsert({
     where: { institutionId_name: { institutionId, name: "2026-27" } },
     update: {},
@@ -41,9 +54,11 @@ async function main() {
   });
 
   const heads = [
-    { code: "TUI", name: "Tuition Fee", isTuition: true },
-    { code: "ADM", name: "Admission Fee" },
-    { code: "TRN", name: "Transport Fee", isOptional: true },
+    { code: "TUI", name: "Tuition Fee", isTuition: true, feeTypeId: typeMap.ACA, bankAccountId: bank.id },
+    { code: "ADM", name: "Admission Fee", feeTypeId: typeMap.ADM, concessionAllowed: false, fineApplicable: false },
+    { code: "TRN", name: "Transport Fee", isOptional: true, feeTypeId: typeMap.TRN },
+    { code: "EXM", name: "Exam Fee", feeTypeId: typeMap.EXM },
+    { code: "CAU", name: "Caution Deposit", isRefundable: true, feeTypeId: typeMap.DEP, concessionAllowed: false, fineApplicable: false },
   ];
   const headMap: Record<string, string> = {};
   for (const h of heads) {
@@ -55,6 +70,8 @@ async function main() {
     headMap[h.code] = fh.id;
   }
 
+  await prisma.concession.create({ data: { institutionId, name: "Sibling concession", type: "percent", valueBps: 1000, feeHeadId: headMap.TUI } });
+  await prisma.concession.create({ data: { institutionId, name: "Staff ward", type: "percent", valueBps: 5000, feeHeadId: headMap.TUI } });
   const fine = await prisma.lateFineRule.create({
     data: { institutionId, name: "₹10/day after 10 days", type: "per_day", graceDays: 10, amountPaise: rupees(10), maxPaise: rupees(500) },
   });

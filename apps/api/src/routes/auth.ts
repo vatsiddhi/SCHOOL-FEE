@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { signToken } from "../lib/jwt";
 import { requireAuth } from "../middleware/auth";
+import { PERMS, Role } from "../lib/rbac";
 
 export const auth = Router();
 
@@ -14,7 +15,7 @@ const LoginBody = z.object({
 });
 
 const publicUser = (u: { id: string; name: string; email: string | null; role: string }, inst: { code: string; name: string }) => ({
-  id: u.id, name: u.name, email: u.email, role: u.role,
+  id: u.id, name: u.name, email: u.email, role: u.role, perms: PERMS[u.role as Role] || [],
   institution: { code: inst.code, name: inst.name },
 });
 

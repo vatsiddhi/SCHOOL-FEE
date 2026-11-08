@@ -1,4 +1,5 @@
-export type User = { id: string; name: string; email: string | null; role: string; institution: { code: string; name: string } };
+export type User = { id: string; name: string; email: string | null; role: string; perms: string[]; institution: { code: string; name: string } };
+export const can = (u: User | null, perm: string) => !!u?.perms?.includes(perm);
 
 const KEY = "feedesk.token";
 
@@ -25,3 +26,16 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const inr = (paise: number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(paise / 100);
+
+export const http = {
+  get: <T,>(p: string) => api<T>(p),
+  post: <T,>(p: string, b: unknown) => api<T>(p, { method: "POST", body: JSON.stringify(b) }),
+  put: <T,>(p: string, b: unknown) => api<T>(p, { method: "PUT", body: JSON.stringify(b) }),
+  del: <T,>(p: string) => api<T>(p, { method: "DELETE" }),
+};
+export const inr2 = (paise: number) =>
+  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2 }).format(paise / 100);
+export const toPaise = (rupees: string | number) => Math.round(Number(rupees || 0) * 100);
+export const fmtDate = (d: string | Date | null | undefined) =>
+  d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }) : "–";
+export const isoDate = (d: string | Date | null | undefined) => (d ? new Date(d).toISOString().slice(0, 10) : "");
