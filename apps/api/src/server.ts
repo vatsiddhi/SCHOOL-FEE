@@ -5,6 +5,8 @@ import path from "path";
 import fs from "fs";
 import { tenant } from "./middleware/tenant";
 import { students } from "./routes/students";
+import { auth } from "./routes/auth";
+import { requireAuth } from "./middleware/auth";
 
 const app = express();
 app.use(helmet({ contentSecurityPolicy: false }));
@@ -12,7 +14,8 @@ app.use(cors());
 app.use(express.json());
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
-app.use("/api/students", tenant, students);
+app.use("/api/auth", auth);
+app.use("/api/students", requireAuth, students);
 
 // Serve the built React app (single-service deploy)
 const webDist = path.resolve(__dirname, "../../web/dist");

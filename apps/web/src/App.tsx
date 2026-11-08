@@ -1,23 +1,21 @@
-import { useEffect, useState } from "react";
-
-type Row = { id: string; admissionNo: string; name: string; outstandingPaise: number };
-const inr = (p: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(p / 100);
+import { useCallback, useEffect, useState } from "react";
+import { api, clearToken, getToken, type User } from "./lib/api";
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
 
 export default function App() {
-  const [rows, setRows] = useState<Row[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const [checking, setChecking] = useState(!!getToken());
+
   useEffect(() => {
-    fetch("/api/students", { headers: { "x-institution-code": "demo-school" } })
-      .then(r => r.json()).then(setRows);
+    if (!getToken()) return;
+    api<{ user: User }>("/api/auth/me").then(r => setUser(r.user)).catch(() => clearToken()).finally(() => setChecking(false));
   }, []);
-  return (
-    <main style={{ fontFamily: "system-ui", padding: 24 }}>
-      <h1>FeeDesk · Demo Public School</h1>
-      <table cellPadding={8}>
-        <thead><tr><th>Adm. No</th><th>Student</th><th>Outstanding</th></tr></thead>
-        <tbody>{rows.map(r => (
-          <tr key={r.id}><td>{r.admissionNo}</td><td>{r.name}</td><td>{inr(r.outstandingPaise)}</td></tr>
-        ))}</tbody>
-      </table>
-    </main>
-  );
+
+  useEffect(() => { document.title = user ? `FeeDesk · ${user.institution.name}` : "FeeDesk · Sign in"; }, [user]);
+
+  const signOut = useCallback(() => { clearToken(); setUser(null); }, []);
+
+  if (checking) return <div className="boot"><span className="spinner dark" /></div>;
+  return user ? <Dashboard user={user} onSignOut={signOut} /> : <Login onSignedIn={setUser} />;
 }
