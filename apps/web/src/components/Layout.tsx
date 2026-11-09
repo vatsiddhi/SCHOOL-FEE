@@ -4,7 +4,7 @@ import { can, type User } from "../lib/api";
 
 type Item = { to: string; label: string; perm?: string };
 const NAV: { title?: string; items: Item[] }[] = [
-  { items: [{ to: "/", label: "Dashboard" }, { to: "/students", label: "Students", perm: "students.read" }] },
+  { items: [{ to: "/", label: "Dashboard" }, { to: "/collect", label: "Collect fees", perm: "collect" }, { to: "/collections", label: "Day's collection", perm: "collect" }, { to: "/students", label: "Students", perm: "students.read" }] },
   { title: "Setup", items: [
     { to: "/setup", label: "Setup checklist", perm: "setup.read" },
     { to: "/setup/organisation", label: "Organisation", perm: "setup.read" },

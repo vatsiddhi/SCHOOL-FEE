@@ -9,6 +9,9 @@ import StudentForm from "./pages/students/StudentForm";
 import StudentDetail from "./pages/students/StudentDetail";
 import Import from "./pages/students/Import";
 import FeeMapping from "./pages/setup/FeeMapping";
+import Collect from "./pages/collect/Collect";
+import Receipt from "./pages/collect/Receipt";
+import Collections from "./pages/collect/Collections";
 import SetupHome from "./pages/setup/SetupHome";
 import Organisation from "./pages/setup/Organisation";
 import FeeStructures from "./pages/setup/FeeStructures";
@@ -33,6 +36,11 @@ export default function App() {
       <Routes>
         <Route element={<LayoutWithCtx user={user} onSignOut={signOut} />}>
           <Route index element={<Dashboard />} />
+          <Route element={<Guard perm="collect" />}>
+            <Route path="collect" element={<Collect />} />
+            <Route path="collections" element={<Collections />} />
+            <Route path="receipts/:id" element={<Receipt />} />
+          </Route>
           <Route element={<Guard perm="students.read" />}>
             <Route path="students" element={<Students />} />
             <Route path="students/:id" element={<StudentDetail />} />
